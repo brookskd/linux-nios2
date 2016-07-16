@@ -122,7 +122,6 @@ struct altera_quadspi {
 };
 
 struct altera_quadspi_flash {
-	struct mtd_info mtd;
 	struct spi_nor nor;
 	struct altera_quadspi *q;
 };
@@ -160,7 +159,7 @@ static struct flash_device flash_devices[] = {
 };
 
 static int altera_quadspi_write_reg(struct spi_nor *nor, u8 opcode, u8 *val,
-				    int len, int wr_en)
+				    int len)
 {
 	return 0;
 }
@@ -230,7 +229,7 @@ static int altera_quadspi_erase(struct spi_nor *nor, loff_t offset)
 {
 	struct altera_quadspi_flash *flash = nor->priv;
 	struct altera_quadspi *q = flash->q;
-	struct mtd_info *mtd = &flash->mtd;
+	struct mtd_info *mtd = &nor->mtd;
 	u32 val;
 	int sector_value;
 
@@ -280,7 +279,7 @@ static int altera_quadspi_lock(struct spi_nor *nor, loff_t ofs, uint64_t len)
 {
 	struct altera_quadspi_flash *flash = nor->priv;
 	struct altera_quadspi *q = flash->q;
-	struct mtd_info *mtd = &flash->mtd;
+	struct mtd_info *mtd = &nor->mtd;
 	uint32_t offset = ofs;
 	u32 sector_start, sector_end;
 	uint64_t num_sectors;
@@ -431,10 +430,9 @@ static int altera_quadspi_setup_banks(struct platform_device *pdev,
 
 	q->flash[bank] = flash;
 	nor = &flash->nor;
-	nor->mtd = &flash->mtd;
 	nor->dev = &pdev->dev;
 	nor->priv = flash;
-	flash->mtd.priv = nor;
+	nor->mtd.priv = nor;
 	flash->q = q;
 
 	/* spi nor framework*/
@@ -460,9 +458,9 @@ static int altera_quadspi_setup_banks(struct platform_device *pdev,
 	if (ret)
 		return ret;
 
-	ppdata.of_node = np;
+	nor->mtd.dev.of_node = np;
 
-	return mtd_device_parse_register(&flash->mtd, NULL, &ppdata, NULL, 0);
+	return mtd_device_parse_register(&nor->mtd, NULL, &ppdata, NULL, 0);
 }
 
 static int altera_quadspi_probe(struct platform_device *pdev)
@@ -526,7 +524,7 @@ static int altera_quadspi_remove(struct platform_device *pdev)
 			continue;
 
 		/* clean up mtd stuff */
-		ret = mtd_device_unregister(&flash->mtd);
+		ret = mtd_device_unregister(&flash->nor.mtd);
 		if (ret) {
 			dev_err(&pdev->dev, "error removing mtd\n");
 			return ret;
